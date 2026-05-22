@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}THVL{% endblock %} — Quản lý phát sóng</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:14px;background:#F4F5F7;color:#172B4D;min-height:100vh}
+a{color:#0052CC;text-decoration:none}a:hover{text-decoration:underline}
+
+/* TOP BAR */
+.topbar{height:54px;background:#0747A6;display:flex;align-items:center;padding:0 20px;gap:16px;position:sticky;top:0;z-index:100}
+.topbar-brand{color:#fff;font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;white-space:nowrap}
+.topbar-brand span{opacity:.7;font-weight:400}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.topbar-user{color:#BCD4F6;font-size:13px;text-align:right;line-height:1.3}
+.topbar-user strong{color:#fff;display:block}
+.avatar{width:32px;height:32px;border-radius:50%;background:#1565D8;border:2px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+.topbar a.btn-logout{padding:5px 12px;border:1px solid rgba(255,255,255,.3);border-radius:5px;color:#BCD4F6;font-size:12px}
+.topbar a.btn-logout:hover{background:rgba(255,255,255,.1);text-decoration:none}
+
+/* REALTIME DOT */
+.live-dot{width:8px;height:8px;border-radius:50%;background:#36B37E;display:inline-block;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* SIDEBAR */
+.layout{display:flex;min-height:calc(100vh - 54px)}
+.sidebar{width:210px;background:#fff;border-right:1px solid #DFE1E6;flex-shrink:0;padding:12px 0;position:sticky;top:54px;height:calc(100vh - 54px);overflow-y:auto}
+.nav-section{font-size:11px;font-weight:700;color:#7A869A;padding:14px 16px 4px;letter-spacing:.6px;text-transform:uppercase}
+.nav-link{display:flex;align-items:center;gap:9px;padding:8px 16px;font-size:13px;color:#42526E;border-left:3px solid transparent;transition:all .12s}
+.nav-link:hover{background:#F4F5F7;color:#172B4D;text-decoration:none}
+.nav-link.active{background:#E9F2FF;color:#0747A6;border-left-color:#0747A6;font-weight:600}
+.nav-link .ico{font-size:15px;width:18px;text-align:center}
+.nav-badge{margin-left:auto;background:#DE350B;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700}
+
+/* MAIN */
+.main{flex:1;padding:20px 24px;min-width:0}
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;gap:12px;flex-wrap:wrap}
+.page-title{font-size:20px;font-weight:700;color:#172B4D}
+.page-sub{font-size:13px;color:#7A869A;margin-top:3px}
+.btn-group{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+/* CARDS */
+.card{background:#fff;border:1px solid #DFE1E6;border-radius:8px;padding:16px 20px;margin-bottom:16px}
+.card-title{font-size:13px;font-weight:700;color:#42526E;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;text-transform:uppercase;letter-spacing:.3px}
+
+/* GRIDS */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+
+/* STAT CARDS */
+.stat{background:#fff;border:1px solid #DFE1E6;border-radius:8px;padding:14px 16px}
+.stat-val{font-size:28px;font-weight:800;line-height:1;margin-bottom:3px}
+.stat-label{font-size:12px;color:#7A869A}
+.stat-sub{font-size:11px;color:#97A0AF;margin-top:3px}
+.c-blue{color:#0747A6}.c-green{color:#006644}.c-red{color:#BF2600}.c-amber{color:#974F0C}
+
+/* TABLE */
+.tbl-wrap{background:#fff;border:1px solid #DFE1E6;border-radius:8px;overflow:hidden;margin-bottom:16px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:#F4F5F7;padding:9px 12px;text-align:left;font-weight:700;font-size:11px;color:#7A869A;border-bottom:1px solid #DFE1E6;white-space:nowrap;text-transform:uppercase;letter-spacing:.4px}
+td{padding:9px 12px;border-bottom:1px solid #F4F5F7;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:#F8F9FF}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:700;white-space:nowrap}
+.b-cho{background:#FFFAE6;color:#974F0C}
+.b-duyet{background:#E3FCEF;color:#006644}
+.b-tra{background:#FFEBE6;color:#BF2600}
+.b-blue{background:#E9F2FF;color:#0747A6}
+.b-gray{background:#F4F5F7;color:#42526E}
+.b-purple{background:#EAE6FF;color:#403294}
+.b-live{background:#FFEBE6;color:#BF2600;animation:pulse 2s infinite}
+.b-ok{background:#E3FCEF;color:#006644}
+
+/* FORMS */
+.fg{margin-bottom:12px}
+.fl{display:block;font-size:12px;font-weight:700;color:#42526E;margin-bottom:4px}
+.fi,.fs,.ft{width:100%;padding:7px 10px;border:2px solid #DFE1E6;border-radius:4px;font-size:13px;color:#172B4D;background:#FAFBFC;transition:border .15s}
+.fi:focus,.fs:focus,.ft:focus{outline:none;border-color:#4C9AFF;background:#fff}
+.ft{resize:vertical;min-height:70px}
+.fh{font-size:11px;color:#7A869A;margin-top:3px}
+.fi-sm{width:auto;min-width:120px}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .12s;white-space:nowrap}
+.btn:hover{text-decoration:none;opacity:.9}
+.btn-primary{background:#0747A6;color:#fff}.btn-primary:hover{background:#0052CC}
+.btn-success{background:#006644;color:#fff}.btn-success:hover{background:#00875A}
+.btn-warn{background:#FF8B00;color:#fff}.btn-warn:hover{background:#FF991F}
+.btn-danger{background:#DE350B;color:#fff}.btn-danger:hover{background:#BF2600}
+.btn-ghost{background:#fff;color:#42526E;border:2px solid #DFE1E6}.btn-ghost:hover{background:#F4F5F7}
+.btn-sm{padding:4px 10px;font-size:12px}
+.btn-xs{padding:3px 7px;font-size:11px}
+
+/* ALERTS */
+.alert{padding:10px 14px;border-radius:4px;font-size:13px;margin-bottom:12px;display:flex;align-items:flex-start;gap:8px;border-left:4px solid}
+.a-success{background:#E3FCEF;color:#006644;border-color:#36B37E}
+.a-danger{background:#FFEBE6;color:#BF2600;border-color:#DE350B}
+.a-warning{background:#FFFAE6;color:#974F0C;border-color:#FF8B00}
+.a-info{background:#E9F2FF;color:#0747A6;border-color:#4C9AFF}
+
+/* MODAL */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(9,30,66,.5);z-index:200;align-items:center;justify-content:center}
+.modal-bg.open{display:flex}
+.modal-box{background:#fff;border-radius:8px;padding:24px;width:520px;max-width:96vw;max-height:88vh;overflow-y:auto;box-shadow:0 8px 32px rgba(9,30,66,.25)}
+.modal-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.modal-title{font-size:16px;font-weight:700}
+
+/* FILTER BAR */
+.filter-bar{background:#fff;border:1px solid #DFE1E6;border-radius:8px;padding:10px 14px;margin-bottom:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+/* FILE PATH */
+.fpath{font-family:Consolas,monospace;font-size:12px;background:#F4F5F7;padding:4px 8px;border-radius:3px;word-break:break-all;display:inline-block;color:#172B4D;border:1px solid #DFE1E6}
+
+/* PROGRESS */
+.progress{height:8px;background:#DFE1E6;border-radius:4px;overflow:hidden}
+.progress-fill{height:100%;background:#36B37E;border-radius:4px;transition:width .3s}
+
+/* DIVIDER */
+hr{border:none;border-top:1px solid #DFE1E6;margin:16px 0}
+
+/* Lịch timeline row */
+.trow-truc{background:#FFF7F5}
+.trow-ok{background:#F6FFF9}
+.trow-cho{background:#FFFAE5}
+.trow-thieu{background:#FFF0EF}
+
+@media(max-width:768px){.sidebar{display:none}.g4{grid-template-columns:1fr 1fr}.g3,.g2{grid-template-columns:1fr}}
+</style>
+{% block head %}{% endblock %}
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">📺 THVL <span>Quản lý phát sóng</span></div>
+  {% if session.user_id %}
+  <div class="topbar-right">
+    <span class="live-dot" title="Realtime"></span>
+    <div class="topbar-user">
+      <strong>{{ session.full_name }}</strong>{{ session.phong_ban }}
+    </div>
+    <div class="avatar">{{ session.full_name[:2].upper() }}</div>
+    <a href="{{ url_for('logout') }}" class="btn-logout">Đăng xuất</a>
+  </div>
+  {% endif %}
+</div>
+
+{% if session.user_id %}
+<div class="layout">
+<nav class="sidebar">
+  <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint=='dashboard' %}active{% endif %}">
+    <span class="ico">📊</span> Dashboard
+  </a>
+
+  <div class="nav-section">Phát sóng</div>
+  <a href="{{ url_for('lich_list') }}" class="nav-link {% if 'lich' in request.endpoint %}active{% endif %}">
+    <span class="ico">📅</span> Lịch HDPS
+  </a>
+
+  {% if session.role in ['admin','phongcm','phongct'] %}
+  <div class="nav-section">Nghiệm thu</div>
+  <a href="{{ url_for('phieu_list') }}" class="nav-link {% if 'phieu' in request.endpoint %}active{% endif %}">
+    <span class="ico">📋</span> Phiếu nghiệm thu
+    {%- set n = namespace(c=0) %}
+    {%- if session.role in ['admin','phongct'] %}
+      {# badge shown in template directly #}
+    {%- endif %}
+  </a>
+  <a href="{{ url_for('phieu_new') }}" class="nav-link">
+    <span class="ico">➕</span> Nộp phiếu mới
+  </a>
+  {% endif %}
+
+  {% if session.role in ['admin','phongct','phatsong'] %}
+  <div class="nav-section">File & Xuất</div>
+  <a href="{{ url_for('copy_list') }}" class="nav-link {% if 'copy' in request.endpoint %}active{% endif %}">
+    <span class="ico">📁</span> Copy file
+  </a>
+  {% endif %}
+
+  {% if session.role == 'admin' %}
+  <div class="nav-section">Hệ thống</div>
+  <a href="{{ url_for('user_list') }}" class="nav-link {% if 'user' in request.endpoint %}active{% endif %}">
+    <span class="ico">👥</span> Tài khoản
+  </a>
+  <a href="{{ url_for('settings') }}" class="nav-link {% if request.endpoint=='settings' %}active{% endif %}">
+    <span class="ico">⚙️</span> Cài đặt
+  </a>
+  {% endif %}
+</nav>
+
+<div class="main">
+{% endif %}
+
+{% with msgs = get_flashed_messages(with_categories=true) %}
+  {% if msgs %}{% for cat,msg in msgs %}
+  <div class="alert {% if cat=='success' %}a-success{% elif cat=='danger' %}a-danger{% elif cat=='warning' %}a-warning{% else %}a-info{% endif %}">
+    {{ msg }}
+  </div>
+  {% endfor %}{% endif %}
+{% endwith %}
+
+{% block content %}{% endblock %}
+
+{% if session.user_id %}</div></div>{% endif %}
+</body>
+</html>

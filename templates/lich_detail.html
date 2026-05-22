@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+{% block title %}Lịch {{ lich.kenh }} {{ lich.ngay_phat.strftime('%d/%m/%Y') }}{% endblock %}
+{% block head %}
+<style>
+.item-row{transition:background .2s}
+.item-row td{padding:7px 10px;vertical-align:middle}
+.gio{font-family:Consolas,monospace;font-size:12px;color:#42526E;white-space:nowrap}
+.ten-ct{font-weight:600;font-size:13px}
+.ten-ct small{font-weight:400;color:#7A869A;display:block;font-size:11px;margin-top:1px}
+.tl{font-family:Consolas,monospace;font-size:12px}
+</style>
+<script>
+let autoRefresh = true;
+function pollStatus(){
+  if(!autoRefresh) return;
+  fetch('/api/lich/{{ lich.id }}/status')
+    .then(r=>r.json()).then(items=>{
+      items.forEach(item=>{
+        const row = document.getElementById('row-'+item.id);
+        if(!row) return;
+        const badge = row.querySelector('.status-badge');
+        if(badge){
+          badge.className = 'badge status-badge ' + statusClass(item.trang_thai);
+          badge.textContent = statusLabel(item.trang_thai);
+        }
+      });
+    }).catch(()=>{});
+}
+function statusClass(s){
+  const m={'cho':'b-cho','co_file':'b-blue','da_xac_nhan':'b-duyet','thieu_file':'b-tra','truc_tiep':'b-live','stop':'b-gray'};
+  return m[s]||'b-gray';
+}
+function statusLabel(s){
+  const m={'cho':'Chờ file','co_file':'Có phiếu NT','da_xac_nhan':'Đã xác nhận','thieu_file':'Thiếu file','truc_tiep':'Trực tiếp','stop':'Stop'};
+  return m[s]||s;
+}
+setInterval(pollStatus, 8000);
+
+function confirmItem(iid){
+  fetch('/lich/item/'+iid+'/xac_nhan', {method:'POST',
+    headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:'csrf=1'
+  }).then(()=>pollStatus());
+}
+function openTraVeModal(ly_do){
+  document.getElementById('traVeReason').textContent = ly_do || '';
+  document.getElementById('modalTraVe').classList.add('open');
+}
+</script>
+{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <div class="page-title">
+      {{ lich.kenh }} — {{ lich.ngay_phat.strftime('%A, %d/%m/%Y') }}
+      <span class="badge {% if lich.trang_thai=='hoan_chinh' %}b-duyet{% elif lich.trang_thai=='da_xuat' %}b-blue{% else %}b-cho{% endif %}" style="font-size:12px;margin-left:8px">{{ lich.trang_thai }}</span>
+    </div>
+    <div class="page-sub">{{ stats.tong }} mục &middot; {{ stats.truc_tiep }} trực tiếp &middot; QC: {{ tl_qc_total }}</div>
+  </div>
+  <div class="btn-group">
+    {% if session.role in ['admin','phongct'] %}
+    <button onclick="document.getElementById('modalAdd').classList.add('open')" class="btn btn-ghost btn-sm">+ Thêm mục</button>
+    {% if lich.trang_thai == 'nhap' %}
+    <form method="POST" action="{{ url_for('lich_hoan_chinh', lid=lich.id) }}" style="display:inline">
+      <button class="btn btn-success btn-sm">✓ Hoàn chỉnh lịch</button>
+    </form>
+    {% endif %}
+    {% endif %}
+    <a href="{{ url_for('xuat_ply', lid=lich.id) }}" class="btn btn-primary btn-sm">⬇ Xuất file .ply</a>
+  </div>
+</div>
+
+<!-- Stats bar -->
+<div class="g4" style="margin-bottom:14px">
+  <div class="stat" style="padding:10px 14px">
+    <div class="stat-val c-green" style="font-size:22px">{{ stats.da_xac_nhan }}</div>
+    <div class="stat-label">Đã xác nhận</div>
+  </div>
+  <div class="stat" style="padding:10px 14px">
+    <div class="stat-val c-blue" style="font-size:22px">{{ stats.co_file }}</div>
+    <div class="stat-label">Có phiếu NT</div>
+  </div>
+  <div class="stat" style="padding:10px 14px">
+    <div class="stat-val c-amber" style="font-size:22px">{{ stats.cho }}</div>
+    <div class="stat-label">Chờ file</div>
+  </div>
+  <div class="stat" style="padding:10px 14px">
+    <div class="stat-val c-red" style="font-size:22px">{{ stats.thieu }}</div>
+    <div class="stat-label">Thiếu file</div>
+  </div>
+</div>
+
+<!-- Progress bar tổng thể -->
+{% set pct = ((stats.da_xac_nhan + stats.co_file + stats.truc_tiep) / stats.tong * 100)|int if stats.tong > 0 else 0 %}
+<div style="margin-bottom:14px">
+  <div style="display:flex;justify-content:space-between;font-size:12px;color:#7A869A;margin-bottom:4px">
+    <span>Tiến độ chuẩn bị file</span><span>{{ pct }}%</span>
+  </div>
+  <div class="progress"><div class="progress-fill" style="width:{{ pct }}%"></div></div>
+</div>
+
+<!-- Main table -->
+<div class="tbl-wrap">
+<table>
+  <thead>
+    <tr>
+      <th style="width:36px">#</th>
+      <th style="width:80px">Giờ phát</th>
+      <th>Tên chương trình</th>
+      <th style="width:72px">T.lượng</th>
+      <th style="width:60px">QC</th>
+      <th style="width:100px">Loại</th>
+      <th style="width:120px">Trạng thái</th>
+      <th style="width:140px">File / Path</th>
+      {% if session.role in ['admin','phongct'] %}<th style="width:90px"></th>{% endif %}
+    </tr>
+  </thead>
+  <tbody>
+  {% for item in items %}
+  <tr class="item-row {% if item.loai=='truc_tiep' %}trow-truc{% elif item.trang_thai=='da_xac_nhan' %}trow-ok{% elif item.trang_thai=='cho' %}trow-cho{% elif item.trang_thai=='thieu_file' %}trow-thieu{% endif %}"
+      id="row-{{ item.id }}">
+    <td style="color:#97A0AF;font-size:12px">{{ item.stt }}</td>
+    <td class="gio">{{ item.gio_phat or '—' }}</td>
+    <td>
+      <div class="ten-ct">{{ item.ten_ct }}
+        {% if item.tai_tro == 'co' %}<span class="badge b-duyet" style="font-size:10px;margin-left:4px">CÓ TÀI TRỢ</span>{% endif %}
+        {% if item.ghi_chu %}<small>{{ item.ghi_chu }}</small>{% endif %}
+      </div>
+      {% if item.phieu_nt %}
+      <div style="font-size:11px;color:#0052CC;margin-top:2px">🔗 Phiếu NT: {{ item.phieu_nt.ten_ct|truncate(40) }}</div>
+      {% endif %}
+    </td>
+    <td class="tl">{{ item.tl_ct or '—' }}</td>
+    <td class="tl" style="color:#974F0C">{{ item.tl_qc or '—' }}</td>
+    <td>
+      {% if item.loai=='truc_tiep' %}<span class="badge b-live">🔴 Trực tiếp</span>
+      {% elif item.loai=='phat_lai' %}<span class="badge b-gray">🔄 Phát lại</span>
+      {% elif item.loai=='phong_cm' %}<span class="badge b-purple">🏢 Phòng CM</span>
+      {% elif item.loai=='stop' %}<span class="badge b-gray">⏹ Stop</span>
+      {% else %}<span class="badge b-blue">📁 File</span>{% endif %}
+    </td>
+    <td>
+      <span class="badge status-badge {{ 'b-cho' if item.trang_thai=='cho' else 'b-duyet' if item.trang_thai=='da_xac_nhan' else 'b-blue' if item.trang_thai=='co_file' else 'b-tra' if item.trang_thai=='thieu_file' else 'b-live' if item.trang_thai=='truc_tiep' else 'b-gray' }}">
+        {{ {'cho':'Chờ file','co_file':'Có phiếu NT','da_xac_nhan':'Đã xác nhận','thieu_file':'Thiếu file','truc_tiep':'Trực tiếp','stop':'Stop'}.get(item.trang_thai, item.trang_thai) }}
+      </span>
+    </td>
+    <td style="max-width:140px">
+      {% if item.ten_file %}
+      <div style="font-family:Consolas,monospace;font-size:10px;color:#172B4D;word-break:break-all;line-height:1.4">
+        {% for line in item.ten_file.strip().split('\n') %}{% if line.strip() %}{{ line.strip() }}.mpg<br>{% endif %}{% endfor %}
+      </div>
+      {% elif item.duong_dan and item.loai not in ['truc_tiep','stop'] %}
+      <div style="font-size:10px;color:#7A869A;word-break:break-all">{{ item.duong_dan|truncate(50) }}</div>
+      {% else %}
+      <span style="font-size:11px;color:#97A0AF">—</span>
+      {% endif %}
+    </td>
+    {% if session.role in ['admin','phongct'] %}
+    <td>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        <a href="{{ url_for('item_edit', iid=item.id) }}" class="btn btn-ghost btn-xs">Sửa</a>
+        {% if item.trang_thai in ['cho','co_file'] %}
+        <button onclick="confirmItem({{ item.id }})" class="btn btn-success btn-xs">✓</button>
+        {% endif %}
+        <form method="POST" action="{{ url_for('item_delete', iid=item.id) }}" style="display:inline"
+          onsubmit="return confirm('Xóa mục này?')">
+          <button class="btn btn-ghost btn-xs" style="color:#BF2600">✕</button>
+        </form>
+      </div>
+    </td>
+    {% endif %}
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<!-- Copy jobs for this lich -->
+{% if copy_jobs %}
+<div class="card">
+  <div class="card-title">📁 Lịch sử copy file</div>
+  {% for j in copy_jobs %}
+  <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid #F4F5F7" id="cjob-{{ j.id }}">
+    <div style="flex:1;font-size:13px">
+      <strong>{{ j.dest_path }}</strong>
+      <div style="font-size:11px;color:#7A869A">{{ j.created_at.strftime('%d/%m/%Y %H:%M') }} &middot; {{ j.da_copy }}/{{ j.tong_file }} file</div>
+    </div>
+    <div style="width:120px"><div class="progress" style="height:5px"><div class="progress-fill" style="width:{{ (j.da_copy/j.tong_file*100)|int if j.tong_file else 0 }}%"></div></div></div>
+    <span class="badge {% if j.trang_thai=='hoan_thanh' %}b-duyet{% elif j.trang_thai=='dang_chay' %}b-cho{% elif j.trang_thai=='loi' %}b-tra{% else %}b-gray{% endif %}">{{ j.trang_thai }}</span>
+    {% if j.trang_thai == 'dang_chay' %}
+    <button onclick="trackJob({{ j.id }})" class="btn btn-ghost btn-xs">Theo dõi</button>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Modal: Thêm mục lịch -->
+<div class="modal-bg" id="modalAdd">
+  <div class="modal-box">
+    <div class="modal-h">
+      <div class="modal-title">Thêm mục vào lịch</div>
+      <button onclick="document.getElementById('modalAdd').classList.remove('open')" class="btn btn-ghost btn-sm">✕</button>
+    </div>
+    <form method="POST" action="{{ url_for('item_add', lid=lich.id) }}">
+      <div class="g2">
+        <div class="fg"><label class="fl">Giờ phát</label><input class="fi" name="gio_phat" type="time" step="1"></div>
+        <div class="fg"><label class="fl">Loại</label>
+          <select class="fs" name="loai">
+            <option value="file">📁 Có file</option>
+            <option value="truc_tiep">🔴 Trực tiếp</option>
+            <option value="phat_lai">🔄 Phát lại</option>
+            <option value="phong_cm">🏢 Phòng CM giao</option>
+          </select>
+        </div>
+      </div>
+      <div class="fg"><label class="fl">Tên chương trình *</label><input class="fi" name="ten_ct" required placeholder="VD: Phim VN: Chiếc vòng ngọc bích — Tập 32"></div>
+      <div class="g2">
+        <div class="fg"><label class="fl">Thời lượng CT</label><input class="fi" name="tl_ct" placeholder="00:30:00"></div>
+        <div class="fg"><label class="fl">Thời lượng QC</label><input class="fi" name="tl_qc" placeholder="00:03:00"></div>
+      </div>
+      <div class="fg"><label class="fl">Tên file (mỗi file 1 dòng)</label>
+        <textarea class="ft" name="ten_file" rows="2" placeholder="CHIEC VONG NGOC BICH_TAP 32&#10;..."></textarea>
+      </div>
+      <div class="fg"><label class="fl">Đường dẫn server</label><input class="fi" name="duong_dan" placeholder="\\server\phimvietnam$\Chiec vong ngoc bich\File phat song"></div>
+      <div class="g2">
+        <div class="fg"><label class="fl">Tài trợ</label>
+          <select class="fs" name="tai_tro">
+            <option value="khong">Không tài trợ</option>
+            <option value="co">Có tài trợ</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Ghi chú</label><input class="fi" name="ghi_chu" placeholder="Ghi chú thêm..."></div>
+      </div>
+      <hr>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button type="button" onclick="document.getElementById('modalAdd').classList.remove('open')" class="btn btn-ghost">Hủy</button>
+        <button type="submit" class="btn btn-primary">Thêm vào lịch</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open')}));
+
+function trackJob(jid){
+  const win = window.open('','_blank','width=500,height:400');
+  const poll = setInterval(()=>{
+    fetch('/api/copy/'+jid+'/status').then(r=>r.json()).then(d=>{
+      win.document.body.innerHTML = '<pre style="font-family:monospace;font-size:12px;padding:12px">'+d.log+'</pre>';
+      if(d.trang_thai==='hoan_thanh'||d.trang_thai==='loi') clearInterval(poll);
+    });
+  },1000);
+}
+</script>
+{% endblock %}

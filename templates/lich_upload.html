@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% block title %}Upload HDPS Excel{% endblock %}{% block content %}
+<div class="page-header"><div class="page-title">Upload file Excel HDPS</div><a href="{{ url_for('lich_list') }}" class="btn btn-ghost">← Quay lại</a></div>
+<div style="max-width:480px">
+<form method="POST" enctype="multipart/form-data" class="card">
+  <div class="fg"><label class="fl">File Excel HDPS (.xls hoặc .xlsx) *</label><input class="fi" type="file" name="excel_file" accept=".xls,.xlsx" required></div>
+  <div class="fg"><label class="fl">Ngày phát sóng *</label><input class="fi" type="date" name="ngay_phat" required></div>
+  <div class="fg"><label class="fl">Kênh</label><select class="fs" name="kenh"><option>THVL1</option><option>THVL2</option></select></div>
+  <div class="alert a-warning">⚠️ Nếu đã có lịch ngày này, nội dung cũ sẽ bị xóa và thay bằng nội dung từ file Excel.</div>
+  <hr><div style="display:flex;justify-content:flex-end;gap:8px">
+    <a href="{{ url_for('lich_list') }}" class="btn btn-ghost">Hủy</a>
+    <button class="btn btn-primary">⬆ Import</button>
+  </div>
+</form>
+</div>
+{% endblock %}

@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block head %}
+<script>
+function refreshStats(){
+  fetch('/api/lich/0/status').catch(()=>{});
+}
+setInterval(refreshStats, 15000);
+</script>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">Dashboard <span class="live-dot" style="margin-left:6px"></span></div>
+    <div class="page-sub">{{ today.strftime('Thứ %A, %d/%m/%Y') }} — Cập nhật realtime</div>
+  </div>
+  <div class="btn-group">
+    {% if session.role in ['admin','phongcm','phongct'] %}
+    <a href="{{ url_for('phieu_new') }}" class="btn btn-primary">+ Nộp phiếu NT</a>
+    {% endif %}
+    {% if session.role in ['admin','phongct'] %}
+    <a href="{{ url_for('lich_upload') }}" class="btn btn-ghost">⬆ Upload HDPS</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="g4" style="margin-bottom:16px">
+  <div class="stat">
+    <div class="stat-val c-blue">{{ lich_today|length }}</div>
+    <div class="stat-label">Lịch phát hôm nay</div>
+    <div class="stat-sub">{% for l in lich_today %}{{ l.kenh }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-val {% if cho_duyet > 0 %}c-amber{% else %}c-green{% endif %}">{{ cho_duyet }}</div>
+    <div class="stat-label">Phiếu NT chờ duyệt</div>
+    <div class="stat-sub">{% if cho_duyet %}Cần xử lý ngay{% else %}Không có tồn đọng{% endif %}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-val {% if thieu_file > 0 %}c-red{% else %}c-green{% endif %}">{{ thieu_file }}</div>
+    <div class="stat-label">Mục chưa có file</div>
+    <div class="stat-sub">Trong lịch hôm nay</div>
+  </div>
+  <div class="stat">
+    <div class="stat-val c-blue">{{ lich_tom|length }}</div>
+    <div class="stat-label">Lịch ngày mai</div>
+    <div class="stat-sub">{% for l in lich_tom %}{{ l.kenh }}: <span class="badge {% if l.trang_thai=='hoan_chinh' %}b-duyet{% else %}b-cho{% endif %}">{{ l.trang_thai }}</span>{% endfor %}</div>
+  </div>
+</div>
+
+{% if cho_duyet > 0 and session.role in ['admin','phongct'] %}
+<div class="alert a-warning" style="margin-bottom:14px">
+  ⚠️ Có <strong>{{ cho_duyet }}</strong> phiếu nghiệm thu đang chờ duyệt.
+  <a href="{{ url_for('phieu_list', tt='cho_duyet') }}" style="margin-left:8px;font-weight:700">Duyệt ngay →</a>
+</div>
+{% endif %}
+
+{% if thieu_file > 0 %}
+<div class="alert a-danger" style="margin-bottom:14px">
+  🔴 Còn <strong>{{ thieu_file }}</strong> mục trong lịch hôm nay chưa có file đầy đủ.
+</div>
+{% endif %}
+
+<div class="g2">
+<!-- Lịch hôm nay -->
+<div>
+  <div class="card">
+    <div class="card-title">📅 Lịch phát hôm nay
+      <a href="{{ url_for('lich_list') }}" class="btn btn-ghost btn-xs">Xem tất cả</a>
+    </div>
+    {% if lich_today %}
+      {% for l in lich_today %}
+      <div style="margin-bottom:10px;padding:10px;background:#F4F5F7;border-radius:6px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <strong>{{ l.kenh }} — {{ l.ngay_phat.strftime('%d/%m/%Y') }}</strong>
+          <span class="badge {% if l.trang_thai=='hoan_chinh' %}b-duyet{% elif l.trang_thai=='da_xuat' %}b-blue{% else %}b-cho{% endif %}">{{ l.trang_thai }}</span>
+        </div>
+        <div style="font-size:12px;color:#7A869A">
+          {{ l.items|length }} mục &middot;
+          {{ l.items|selectattr('loai','eq','truc_tiep')|list|length }} trực tiếp &middot;
+          {% set ok = l.items|selectattr('trang_thai','in',['da_xac_nhan','truc_tiep','co_file'])|list|length %}
+          <span style="color:#006644">{{ ok }} sẵn sàng</span>
+          {% set cho = l.items|selectattr('trang_thai','eq','cho')|list|length %}
+          {% if cho > 0 %} &middot; <span style="color:#BF2600">{{ cho }} chờ file</span>{% endif %}
+        </div>
+        <div style="margin-top:8px;display:flex;gap:6px">
+          <a href="{{ url_for('lich_detail', lid=l.id) }}" class="btn btn-primary btn-xs">Xem lịch</a>
+          <a href="{{ url_for('xuat_ply', lid=l.id) }}" class="btn btn-ghost btn-xs">⬇ Xuất .ply</a>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div style="text-align:center;padding:24px;color:#7A869A;font-size:13px">
+        Chưa có lịch hôm nay.
+        {% if session.role in ['admin','phongct'] %}
+        <br><a href="{{ url_for('lich_new') }}" class="btn btn-primary btn-sm" style="margin-top:10px">Tạo lịch mới</a>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Phiếu gần đây -->
+<div>
+  <div class="card">
+    <div class="card-title">📋 Phiếu nghiệm thu gần đây
+      <a href="{{ url_for('phieu_list') }}" class="btn btn-ghost btn-xs">Xem tất cả</a>
+    </div>
+    {% if recent_phieu %}
+    <table>
+      <thead><tr><th>Chương trình</th><th>Ngày phát</th><th>Trạng thái</th></tr></thead>
+      <tbody>
+        {% for p in recent_phieu %}
+        <tr>
+          <td>
+            <a href="{{ url_for('phieu_detail', pid=p.id) }}" style="font-weight:600;color:#172B4D">{{ p.ten_ct|truncate(35) }}</a>
+            <div style="font-size:11px;color:#97A0AF">{{ p.phong_ban }}</div>
+          </td>
+          <td style="white-space:nowrap;font-size:12px">{{ p.ngay_phat.strftime('%d/%m') }}</td>
+          <td>
+            {% if p.trang_thai=='cho_duyet' %}<span class="badge b-cho">Chờ duyệt</span>
+            {% elif p.trang_thai=='da_duyet' %}<span class="badge b-duyet">Đã duyệt</span>
+            {% else %}<span class="badge b-tra">Trả về</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="text-align:center;padding:20px;color:#7A869A;font-size:13px">Chưa có phiếu nào.</div>
+    {% endif %}
+  </div>
+
+  <!-- Copy jobs -->
+  {% if copy_jobs %}
+  <div class="card">
+    <div class="card-title">📁 Copy file gần đây</div>
+    {% for j in copy_jobs %}
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F4F5F7">
+      <div style="font-size:13px">
+        {{ j.lich.kenh }} {{ j.lich.ngay_phat.strftime('%d/%m') }}
+        <div style="font-size:11px;color:#7A869A">{{ j.dest_path }}</div>
+      </div>
+      <span class="badge {% if j.trang_thai=='hoan_thanh' %}b-duyet{% elif j.trang_thai=='dang_chay' %}b-cho{% elif j.trang_thai=='loi' %}b-tra{% else %}b-gray{% endif %}">
+        {{ j.trang_thai }}
+      </span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+</div>
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends "base.html" %}{% block title %}Lịch HDPS{% endblock %}{% block content %}
+<div class="page-header">
+  <div class="page-title">Lịch HDPS</div>
+  <div class="btn-group">
+    {% if session.role in ['admin','phongct'] %}
+    <a href="{{ url_for('lich_upload') }}" class="btn btn-ghost">⬆ Upload Excel</a>
+    <a href="{{ url_for('lich_new') }}" class="btn btn-primary">+ Tạo lịch mới</a>
+    {% endif %}
+  </div>
+</div>
+<div class="tbl-wrap">
+<table>
+  <thead><tr><th>Ngày phát</th><th>Kênh</th><th>Số mục</th><th>QC</th><th>Trạng thái</th><th>Người tạo</th><th></th></tr></thead>
+  <tbody>
+  {% for l in lichs %}
+  <tr>
+    <td style="font-weight:600">{{ l.ngay_phat.strftime('%A, %d/%m/%Y') }}</td>
+    <td><span class="badge b-blue">{{ l.kenh }}</span></td>
+    <td>{{ l.items|length }}</td>
+    <td style="font-family:Consolas,monospace;font-size:12px">
+      {{ l.items|selectattr('loai','eq','truc_tiep')|list|length }} TT &middot;
+      {{ l.items|selectattr('trang_thai','eq','da_xac_nhan')|list|length }} OK
+    </td>
+    <td><span class="badge {% if l.trang_thai=='hoan_chinh' %}b-duyet{% elif l.trang_thai=='da_xuat' %}b-blue{% else %}b-cho{% endif %}">{{ l.trang_thai }}</span></td>
+    <td style="font-size:12px;color:#7A869A">{{ l.nguoi_tao.full_name if l.nguoi_tao else '—' }}<br>{{ l.created_at.strftime('%d/%m %H:%M') }}</td>
+    <td>
+      <div style="display:flex;gap:5px">
+        <a href="{{ url_for('lich_detail', lid=l.id) }}" class="btn btn-primary btn-xs">Xem</a>
+        <a href="{{ url_for('xuat_ply', lid=l.id) }}" class="btn btn-ghost btn-xs">⬇ .ply</a>
+      </div>
+    </td>
+  </tr>
+  {% else %}
+  <tr><td colspan="7" style="text-align:center;padding:32px;color:#7A869A">Chưa có lịch nào.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

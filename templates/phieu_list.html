@@ -1,0 +1,67 @@
+{% extends "base.html" %}{% block title %}Phiếu nghiệm thu{% endblock %}{% block content %}
+<div class="page-header">
+  <div class="page-title">Phiếu nghiệm thu</div>
+  <div class="btn-group">
+    {% if session.role in ['admin','phongcm','phongct'] %}
+    <a href="{{ url_for('phieu_new') }}" class="btn btn-primary">+ Nộp phiếu mới</a>
+    {% endif %}
+  </div>
+</div>
+<form method="GET" class="filter-bar">
+  <input class="fi fi-sm" type="date" name="ngay" value="{{ request.args.get('ngay','') }}">
+  {% if session.role != 'phongcm' %}
+  <select class="fs fi-sm" name="phong">
+    <option value="">Tất cả phòng</option>
+    {% for p in phong_list %}<option {{ 'selected' if request.args.get('phong')==p }}>{{ p }}</option>{% endfor %}
+  </select>
+  {% endif %}
+  <select class="fs fi-sm" name="tt">
+    <option value="">Tất cả</option>
+    <option value="cho_duyet" {{ 'selected' if request.args.get('tt')=='cho_duyet' }}>Chờ duyệt</option>
+    <option value="da_duyet" {{ 'selected' if request.args.get('tt')=='da_duyet' }}>Đã duyệt</option>
+    <option value="tra_ve" {{ 'selected' if request.args.get('tt')=='tra_ve' }}>Trả về</option>
+  </select>
+  <button class="btn btn-ghost btn-sm">🔍 Lọc</button>
+  <a href="{{ url_for('phieu_list') }}" class="btn btn-ghost btn-sm">Xóa lọc</a>
+  <span style="margin-left:auto;font-size:12px;color:#7A869A">{{ phieu_list|length }} phiếu</span>
+</form>
+<div class="tbl-wrap">
+<table>
+  <thead><tr><th>#</th><th>Tên chương trình</th><th>Phòng ban</th><th>Ngày phát</th><th>T.lượng</th><th>Tài trợ</th><th>Trạng thái</th><th></th></tr></thead>
+  <tbody>
+  {% for p in phieu_list %}
+  <tr>
+    <td style="color:#97A0AF;font-size:12px">{{ p.id }}</td>
+    <td>
+      <div style="font-weight:600">{{ p.ten_ct }}</div>
+      <div style="font-size:11px;color:#97A0AF">{{ p.nguoi_nop.full_name if p.nguoi_nop else '' }} · {{ p.created_at.strftime('%d/%m %H:%M') }}</div>
+      {% if p.ly_do_tra %}<div style="font-size:11px;color:#BF2600;margin-top:2px">↩ {{ p.ly_do_tra }}</div>{% endif %}
+    </td>
+    <td><span class="badge b-blue">{{ p.phong_ban }}</span></td>
+    <td style="font-size:13px;white-space:nowrap">{{ p.ngay_phat.strftime('%d/%m/%Y') }}</td>
+    <td style="font-size:13px">{{ p.thoi_luong or '—' }}</td>
+    <td>{% if p.tai_tro=='Có tài trợ' %}<span class="badge b-duyet">Có TT</span>{% else %}<span class="badge b-gray">Không</span>{% endif %}</td>
+    <td>
+      {% if p.trang_thai=='cho_duyet' %}<span class="badge b-cho">Chờ duyệt</span>
+      {% elif p.trang_thai=='da_duyet' %}<span class="badge b-duyet">Đã duyệt</span>
+      {% else %}<span class="badge b-tra">Trả về</span>{% endif %}
+    </td>
+    <td>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        <a href="{{ url_for('phieu_detail', pid=p.id) }}" class="btn btn-ghost btn-xs">Xem</a>
+        {% if session.role in ['admin','phongct'] and p.trang_thai=='cho_duyet' %}
+        <form method="POST" action="{{ url_for('phieu_duyet', pid=p.id) }}" style="display:inline"><button class="btn btn-success btn-xs">✓</button></form>
+        {% endif %}
+        {% if (session.role=='phongcm' and p.nguoi_nop_id==session.user_id and p.trang_thai!='da_duyet') or session.role in ['admin','phongct'] %}
+        <a href="{{ url_for('phieu_edit', pid=p.id) }}" class="btn btn-ghost btn-xs">Sửa</a>
+        {% endif %}
+      </div>
+    </td>
+  </tr>
+  {% else %}
+  <tr><td colspan="8" style="text-align:center;padding:32px;color:#7A869A">Không tìm thấy phiếu nào.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

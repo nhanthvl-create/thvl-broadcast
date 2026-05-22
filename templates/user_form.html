@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% block title %}{% if user %}Sửa tài khoản{% else %}Thêm tài khoản{% endif %}{% endblock %}{% block content %}
+<div class="page-header"><div class="page-title">{% if user %}Sửa: {{ user.full_name }}{% else %}Thêm tài khoản{% endif %}</div><a href="{{ url_for('user_list') }}" class="btn btn-ghost">← Quay lại</a></div>
+<div style="max-width:460px"><form method="POST" class="card">
+  <div class="fg"><label class="fl">Họ và tên *</label><input class="fi" name="full_name" required value="{{ user.full_name if user else '' }}"></div>
+  {% if not user %}<div class="fg"><label class="fl">Tên đăng nhập *</label><input class="fi" name="username" required placeholder="Không dấu, liền nhau"></div>{% endif %}
+  <div class="fg"><label class="fl">Phòng ban *</label>
+    <select class="fs" name="phong_ban" required>
+      {% for pb in ['Phòng CT Truyền hình','Phòng Biên dịch','Phòng Thời sự','Phòng SXCT','Phòng CM','Kỹ thuật Phát sóng','Ban Giám đốc'] %}
+      <option {{ 'selected' if user and user.phong_ban==pb }}>{{ pb }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="fg"><label class="fl">Vai trò *</label>
+    <select class="fs" name="role" required>
+      <option value="phongcm" {{ 'selected' if user and user.role=='phongcm' }}>Phòng CM — Nộp phiếu NT</option>
+      <option value="phongct" {{ 'selected' if user and user.role=='phongct' }}>Phòng CT TH — Lịch + Duyệt</option>
+      <option value="phatsong" {{ 'selected' if user and user.role=='phatsong' }}>Phát sóng — Xem lịch + Xuất .ply</option>
+      <option value="admin" {{ 'selected' if user and user.role=='admin' }}>Admin — Toàn quyền</option>
+    </select>
+  </div>
+  <div class="fg"><label class="fl">{% if user %}Mật khẩu mới (trống = không đổi){% else %}Mật khẩu *{% endif %}</label>
+    <input class="fi" type="password" name="password" {% if not user %}required{% endif %} placeholder="Tối thiểu 6 ký tự">
+  </div>
+  {% if user %}<div class="fg"><label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" name="active" {{ 'checked' if user.active }} style="width:auto"> Tài khoản hoạt động</label></div>{% endif %}
+  <hr><div style="display:flex;justify-content:flex-end;gap:8px"><a href="{{ url_for('user_list') }}" class="btn btn-ghost">Hủy</a><button class="btn btn-primary">{% if user %}Lưu{% else %}Tạo{% endif %}</button></div>
+</form></div>{% endblock %}

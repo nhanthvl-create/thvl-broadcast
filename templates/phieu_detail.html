@@ -1,0 +1,84 @@
+{% extends "base.html" %}{% block title %}{{ p.ten_ct }}{% endblock %}{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">{{ p.ten_ct }}</div>
+    <div class="page-sub">{{ p.phong_ban }} · Ngày phát {{ p.ngay_phat.strftime('%d/%m/%Y') }}</div>
+  </div>
+  <div class="btn-group">
+    <a href="{{ url_for('phieu_list') }}" class="btn btn-ghost">← Danh sách</a>
+    {% if (session.role=='phongcm' and p.nguoi_nop_id==session.user_id and p.trang_thai!='da_duyet') or session.role in ['admin','phongct'] %}
+    <a href="{{ url_for('phieu_edit', pid=p.id) }}" class="btn btn-ghost">✏️ Sửa</a>
+    {% endif %}
+    {% if session.role in ['admin','phongct'] and p.trang_thai=='cho_duyet' %}
+    <form method="POST" action="{{ url_for('phieu_duyet', pid=p.id) }}" style="display:inline"><button class="btn btn-success">✓ Duyệt</button></form>
+    <button onclick="document.getElementById('mTraVe').classList.add('open')" class="btn btn-danger">↩ Trả về</button>
+    {% endif %}
+  </div>
+</div>
+{% if p.trang_thai=='tra_ve' and p.ly_do_tra %}<div class="alert a-danger">↩ <strong>Lý do trả về:</strong> {{ p.ly_do_tra }}</div>{% endif %}
+<div class="g2">
+<div>
+  <div class="card">
+    <div class="card-title">Thông tin chương trình</div>
+    <table style="font-size:13px">
+      <tr><td style="color:#7A869A;width:130px;padding:6px 0">Tên CT</td><td style="font-weight:700;padding:6px 0">{{ p.ten_ct }}</td></tr>
+      <tr><td style="color:#7A869A;padding:6px 0">Phòng ban</td><td style="padding:6px 0"><span class="badge b-blue">{{ p.phong_ban }}</span></td></tr>
+      <tr><td style="color:#7A869A;padding:6px 0">Ngày phát</td><td style="padding:6px 0;font-weight:600">{{ p.ngay_phat.strftime('%d/%m/%Y') }}</td></tr>
+      <tr><td style="color:#7A869A;padding:6px 0">Thời lượng</td><td style="padding:6px 0">{{ p.thoi_luong or '—' }}</td></tr>
+      <tr><td style="color:#7A869A;padding:6px 0">Tài trợ</td><td style="padding:6px 0"><span class="badge {% if p.tai_tro=='Có tài trợ' %}b-duyet{% else %}b-gray{% endif %}">{{ p.tai_tro }}</span></td></tr>
+      <tr><td style="color:#7A869A;padding:6px 0">Trạng thái</td><td style="padding:6px 0">
+        {% if p.trang_thai=='cho_duyet' %}<span class="badge b-cho">Chờ duyệt</span>
+        {% elif p.trang_thai=='da_duyet' %}<span class="badge b-duyet">Đã duyệt</span>
+        {% else %}<span class="badge b-tra">Trả về</span>{% endif %}
+      </td></tr>
+    </table>
+  </div>
+  {% if linked %}
+  <div class="card">
+    <div class="card-title">🔗 Liên kết lịch phát sóng</div>
+    {% for item in linked %}
+    <div style="font-size:13px;padding:6px 0;border-bottom:1px solid #F4F5F7">
+      <a href="{{ url_for('lich_detail', lid=item.lich_id) }}" style="font-weight:600">{{ item.gio_phat }} — {{ item.ten_ct }}</a>
+      <div style="font-size:11px;color:#7A869A">{{ item.lich.kenh }} {{ item.lich.ngay_phat.strftime('%d/%m/%Y') }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+<div>
+  <div class="card">
+    <div class="card-title">Thông tin file</div>
+    <div style="margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;color:#7A869A;margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px">Tên file</div>
+      {% for line in p.ten_file.strip().split('\n') %}{% if line.strip() %}
+      <div style="font-family:Consolas,monospace;font-size:12px;padding:3px 0;border-bottom:1px solid #F4F5F7;color:#0052CC">{{ line.strip() }}.mpg</div>
+      {% endif %}{% endfor %}
+    </div>
+    <div>
+      <div style="font-size:11px;font-weight:700;color:#7A869A;margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">Đường dẫn server</div>
+      <span class="fpath">{{ p.duong_dan }}</span>
+    </div>
+    {% if p.ghi_chu %}<div style="margin-top:12px;font-size:13px;color:#42526E;background:#F4F5F7;padding:8px;border-radius:4px">{{ p.ghi_chu }}</div>{% endif %}
+  </div>
+  <div class="card" style="background:#E3FCEF;border-color:#79F2C0">
+    <div class="card-title" style="color:#006644">📋 Tóm tắt cho lập lịch</div>
+    <pre style="font-size:12px;color:#006644;font-family:Consolas,monospace;white-space:pre-wrap">CT: {{ p.ten_ct }}
+Ngày: {{ p.ngay_phat.strftime('%d/%m/%Y') }}
+TG: {{ p.thoi_luong or '?' }}
+File: {% for l in p.ten_file.strip().split('\n') %}{% if l.strip() %}{{ l.strip() }}.mpg {% endif %}{% endfor %}
+Path: {{ p.duong_dan }}</pre>
+  </div>
+</div>
+</div>
+<!-- Modal trả về -->
+<div class="modal-bg" id="mTraVe">
+  <div class="modal-box">
+    <div class="modal-h"><div class="modal-title">Trả về phiếu</div><button onclick="document.getElementById('mTraVe').classList.remove('open')" class="btn btn-ghost btn-sm">✕</button></div>
+    <form method="POST" action="{{ url_for('phieu_tra_ve', pid=p.id) }}">
+      <div class="fg"><label class="fl">Lý do trả về *</label><textarea class="ft" name="ly_do" rows="3" required placeholder="VD: Tên file chưa đúng quy định, thiếu đường dẫn..."></textarea></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px"><button type="button" onclick="document.getElementById('mTraVe').classList.remove('open')" class="btn btn-ghost">Hủy</button><button class="btn btn-danger">↩ Trả về</button></div>
+    </form>
+  </div>
+</div>
+<script>document.getElementById('mTraVe').addEventListener('click',function(e){if(e.target===this)this.classList.remove('open')});</script>
+{% endblock %}

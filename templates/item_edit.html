@@ -1,0 +1,42 @@
+{% extends "base.html" %}{% block title %}Sửa mục lịch{% endblock %}{% block content %}
+<div class="page-header"><div class="page-title">Sửa mục lịch</div><a href="{{ url_for('lich_detail', lid=item.lich_id) }}" class="btn btn-ghost">← Quay lại</a></div>
+<div style="max-width:580px">
+<form method="POST" class="card">
+  <div class="g2">
+    <div class="fg"><label class="fl">Giờ phát</label><input class="fi" name="gio_phat" value="{{ item.gio_phat or '' }}"></div>
+    <div class="fg"><label class="fl">Loại</label>
+      <select class="fs" name="loai">
+        {% for v,l in [('file','📁 Có file'),('truc_tiep','🔴 Trực tiếp'),('phat_lai','🔄 Phát lại'),('phong_cm','🏢 Phòng CM giao')] %}
+        <option value="{{ v }}" {{ 'selected' if item.loai==v }}>{{ l }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  <div class="fg"><label class="fl">Tên chương trình *</label><input class="fi" name="ten_ct" value="{{ item.ten_ct }}" required></div>
+  <div class="g2">
+    <div class="fg"><label class="fl">Thời lượng CT</label><input class="fi" name="tl_ct" value="{{ item.tl_ct or '' }}" placeholder="00:30:00"></div>
+    <div class="fg"><label class="fl">Thời lượng QC</label><input class="fi" name="tl_qc" value="{{ item.tl_qc or '' }}" placeholder="00:03:00"></div>
+  </div>
+  <div class="fg"><label class="fl">Tên file (mỗi file 1 dòng)</label>
+    <textarea class="ft" name="ten_file" rows="3">{{ item.ten_file or '' }}</textarea>
+    <div class="fh">Không cần đuôi .mpg — hệ thống tự thêm khi xuất file .ply</div>
+  </div>
+  <div class="fg"><label class="fl">Đường dẫn server</label>
+    <input class="fi" name="duong_dan" value="{{ item.duong_dan or '' }}" placeholder="\\server\phimvietnam$\...">
+  </div>
+  <div class="g2">
+    <div class="fg"><label class="fl">Tài trợ</label>
+      <select class="fs" name="tai_tro">
+        <option value="khong" {{ 'selected' if item.tai_tro!='co' }}>Không tài trợ</option>
+        <option value="co" {{ 'selected' if item.tai_tro=='co' }}>Có tài trợ</option>
+      </select>
+    </div>
+    <div class="fg"><label class="fl">Ghi chú</label><input class="fi" name="ghi_chu" value="{{ item.ghi_chu or '' }}"></div>
+  </div>
+  <hr><div style="display:flex;justify-content:flex-end;gap:8px">
+    <a href="{{ url_for('lich_detail', lid=item.lich_id) }}" class="btn btn-ghost">Hủy</a>
+    <button class="btn btn-primary">💾 Lưu</button>
+  </div>
+</form>
+</div>
+{% endblock %}

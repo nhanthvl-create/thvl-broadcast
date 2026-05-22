@@ -1,0 +1,97 @@
+{% extends "base.html" %}{% block title %}Copy file về máy phát sóng{% endblock %}{% block content %}
+<div class="page-header"><div class="page-title">Copy file về máy phát sóng</div></div>
+<div class="g2" style="align-items:start">
+<div>
+  <div class="card">
+    <div class="card-title">🚀 Bắt đầu copy mới</div>
+    <form method="POST" action="{{ url_for('copy_start') }}">
+      <div class="fg"><label class="fl">Chọn lịch phát sóng</label>
+        <select class="fs" name="lich_id" required>
+          <option value="">-- Chọn lịch --</option>
+          {% for l in lichs %}<option value="{{ l.id }}">{{ l.kenh }} — {{ l.ngay_phat.strftime('%A %d/%m/%Y') }} ({{ l.items|length }} mục)</option>{% endfor %}
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Đường dẫn đích trên máy phát sóng</label>
+        <input class="fi" name="dest_path" value="{{ default_dest }}" required placeholder="V:\Thanhpham_PS_K1\phatsong_K1_...">
+        <div class="fh">Thư mục sẽ chứa file nội dung trên máy phát sóng (drive V:)</div>
+      </div>
+      <div class="alert a-info">ℹ️ Script sẽ đọc danh sách file từ lịch đã chọn, copy từng file từ server về máy phát sóng qua mạng LAN. Tiến độ hiển thị realtime.</div>
+      <button class="btn btn-primary" style="width:100%">📁 Bắt đầu copy</button>
+    </form>
+  </div>
+</div>
+<div>
+  <div class="card">
+    <div class="card-title">📋 Lịch sử copy (20 lần gần nhất)</div>
+    {% if jobs %}
+    {% for j in jobs %}
+    <div style="padding:10px 0;border-bottom:1px solid #F4F5F7" id="job-{{ j.id }}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <strong style="font-size:13px">{{ j.lich.kenh if j.lich else '?' }} {{ j.lich.ngay_phat.strftime('%d/%m/%Y') if j.lich else '' }}</strong>
+        <span class="badge {% if j.trang_thai=='hoan_thanh' %}b-duyet{% elif j.trang_thai=='dang_chay' %}b-cho{% elif j.trang_thai=='loi' %}b-tra{% else %}b-gray{% endif %}" id="job-status-{{ j.id }}">{{ j.trang_thai }}</span>
+      </div>
+      <div style="font-size:11px;color:#7A869A;margin-bottom:6px">{{ j.dest_path }} · {{ j.created_at.strftime('%d/%m %H:%M') }}</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="progress" style="flex:1"><div class="progress-fill" style="width:{{ (j.da_copy/j.tong_file*100)|int if j.tong_file else 0 }}%" id="job-prog-{{ j.id }}"></div></div>
+        <span style="font-size:12px;color:#42526E" id="job-count-{{ j.id }}">{{ j.da_copy }}/{{ j.tong_file }}</span>
+        {% if j.trang_thai in ['dang_chay','hoan_thanh','loi'] %}
+        <button onclick="showLog({{ j.id }})" class="btn btn-ghost btn-xs">Log</button>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div style="text-align:center;padding:20px;color:#7A869A;font-size:13px">Chưa có lịch sử copy.</div>
+    {% endif %}
+  </div>
+</div>
+</div>
+
+<!-- Modal log -->
+<div class="modal-bg" id="mLog">
+  <div class="modal-box" style="width:600px">
+    <div class="modal-h"><div class="modal-title">Log copy</div><button onclick="document.getElementById('mLog').classList.remove('open');clearInterval(logInterval)" class="btn btn-ghost btn-sm">✕</button></div>
+    <pre id="logContent" style="font-size:12px;font-family:Consolas,monospace;background:#F4F5F7;padding:12px;border-radius:4px;max-height:300px;overflow-y:auto;white-space:pre-wrap"></pre>
+  </div>
+</div>
+
+<script>
+let logInterval;
+function showLog(jid){
+  document.getElementById('mLog').classList.add('open');
+  function poll(){
+    fetch('/api/copy/'+jid+'/status').then(r=>r.json()).then(d=>{
+      document.getElementById('logContent').textContent = d.log||'Đang chờ...';
+      const el = document.getElementById('job-status-'+jid);
+      if(el) el.textContent = d.trang_thai;
+      const pg = document.getElementById('job-prog-'+jid);
+      if(pg && d.tong_file) pg.style.width = (d.da_copy/d.tong_file*100)+'%';
+      const cnt = document.getElementById('job-count-'+jid);
+      if(cnt) cnt.textContent = d.da_copy+'/'+d.tong_file;
+      if(d.trang_thai==='hoan_thanh'||d.trang_thai==='loi') clearInterval(logInterval);
+    });
+  }
+  poll();
+  logInterval = setInterval(poll, 1500);
+}
+// Auto-poll running jobs
+document.querySelectorAll('[id^=job-]').forEach(el=>{
+  const m = el.id.match(/job-status-(\d+)/);
+  if(m){
+    fetch('/api/copy/'+m[1]+'/status').then(r=>r.json()).then(d=>{
+      if(d.trang_thai==='dang_chay'){
+        const interval = setInterval(()=>{
+          fetch('/api/copy/'+m[1]+'/status').then(r=>r.json()).then(d=>{
+            el.textContent = d.trang_thai;
+            const pg = document.getElementById('job-prog-'+m[1]);
+            if(pg && d.tong_file) pg.style.width=(d.da_copy/d.tong_file*100)+'%';
+            if(d.trang_thai!=='dang_chay') clearInterval(interval);
+          });
+        },1500);
+      }
+    });
+  }
+});
+document.getElementById('mLog').addEventListener('click',function(e){if(e.target===this){this.classList.remove('open');clearInterval(logInterval)}});
+</script>
+{% endblock %}

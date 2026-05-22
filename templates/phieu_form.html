@@ -1,0 +1,71 @@
+{% extends "base.html" %}{% block title %}{% if phieu %}Sửa phiếu{% else %}Nộp phiếu NT{% endif %}{% endblock %}{% block content %}
+<div class="page-header">
+  <div><div class="page-title">{% if phieu %}Sửa phiếu nghiệm thu{% else %}Nộp phiếu nghiệm thu mới{% endif %}</div>
+  <div class="page-sub">Điền đầy đủ thông tin tên file và đường dẫn trên server</div></div>
+  <a href="{{ url_for('phieu_list') }}" class="btn btn-ghost">← Quay lại</a>
+</div>
+<div class="g2">
+<form method="POST">
+  <div class="card">
+    <div class="card-title">Thông tin chương trình</div>
+    <div class="fg"><label class="fl">Tên chương trình *</label><input class="fi" name="ten_ct" required value="{{ phieu.ten_ct if phieu else '' }}" placeholder="VD: Tinh hoa bách nghệ — tập 4"></div>
+    <div class="g2">
+      <div class="fg"><label class="fl">Phòng ban *</label>
+        <select class="fs" name="phong_ban" required>
+          {% for pb in ['Phòng Biên dịch','Phòng Thời sự','Phòng SXCT','Phòng CM','Phòng CT Truyền hình'] %}
+          <option {{ 'selected' if (phieu and phieu.phong_ban==pb) or (not phieu and default_phong==pb) }}>{{ pb }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Ngày phát *</label><input class="fi" type="date" name="ngay_phat" required value="{{ phieu.ngay_phat.strftime('%Y-%m-%d') if phieu else '' }}"></div>
+    </div>
+    <div class="g2">
+      <div class="fg"><label class="fl">Thời lượng</label><input class="fi" name="thoi_luong" value="{{ phieu.thoi_luong if phieu else '' }}" placeholder="15'09&quot;"></div>
+      <div class="fg"><label class="fl">Tài trợ</label>
+        <select class="fs" name="tai_tro">
+          <option {{ 'selected' if not phieu or phieu.tai_tro=='Không tài trợ' }}>Không tài trợ</option>
+          <option {{ 'selected' if phieu and phieu.tai_tro=='Có tài trợ' }}>Có tài trợ</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Thông tin file</div>
+    <div class="fg"><label class="fl">Tên file *</label>
+      <textarea class="ft" name="ten_file" rows="4" required placeholder="Mỗi file một dòng:&#10;TGTRUOC0H_16-05-2025_0&#10;TGTRUOC0H_16-05-2025_1 (SUA)">{{ phieu.ten_file if phieu else '' }}</textarea>
+      <div class="fh">Không cần đuôi .mpg. Nhiều file thì mỗi file 1 dòng.</div>
+    </div>
+    <div class="fg"><label class="fl">Đường dẫn trên server *</label>
+      <input class="fi" name="duong_dan" required value="{{ phieu.duong_dan if phieu else '' }}" placeholder="X:\P. Thoi su\HOA DEP GIUA DOI THUONG 2024\FILE PHAT SONG\THANG 05 - 2025">
+      <div class="fh">Đường dẫn thư mục chứa file trên máy chủ.</div>
+    </div>
+    <div class="fg"><label class="fl">Ghi chú</label><textarea class="ft" name="ghi_chu" rows="2">{{ phieu.ghi_chu if phieu else '' }}</textarea></div>
+  </div>
+  <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px">
+    <a href="{{ url_for('phieu_list') }}" class="btn btn-ghost">Hủy</a>
+    <button class="btn btn-primary">{% if phieu %}💾 Lưu{% else %}📤 Nộp phiếu{% endif %}</button>
+  </div>
+</form>
+<div>
+  <div class="card" style="background:#E9F2FF;border-color:#4C9AFF">
+    <div class="card-title" style="color:#0747A6">📌 Hướng dẫn</div>
+    <div style="font-size:13px;color:#0747A6;line-height:1.8">
+      <strong>Tên file:</strong> Ghi đúng tên file đã render, không cần .mpg. Nhiều file thì mỗi dòng một file.<br>
+      <strong>Đường dẫn:</strong> Là địa chỉ thư mục trên máy chủ nơi lưu file. Ví dụ:<br>
+      <span class="fpath">X:\P. Thoi su\HOA DEP GIUA DOI THUONG 2024\FILE PHAT SONG\THANG 05 - 2025</span><br>
+      <strong>Sau khi nộp:</strong> Hệ thống sẽ tự động ghép với lịch HDPS nếu tên chương trình khớp.
+    </div>
+  </div>
+  {% if phieu %}
+  <div class="card">
+    <div class="card-title">Lịch sử</div>
+    <div style="font-size:13px;color:#42526E">
+      Nộp bởi: <strong>{{ phieu.nguoi_nop.full_name if phieu.nguoi_nop else '—' }}</strong><br>
+      Ngày nộp: {{ phieu.created_at.strftime('%d/%m/%Y %H:%M') }}<br>
+      {% if phieu.ly_do_tra %}<span style="color:#BF2600">Lý do trả về: {{ phieu.ly_do_tra }}</span>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+</div>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% block title %}Cài đặt{% endblock %}{% block content %}
+<div class="page-header"><div class="page-title">Cài đặt hệ thống</div></div>
+<div style="max-width:480px"><form method="POST" class="card">
+  <div class="card-title">Đường dẫn mặc định</div>
+  <div class="fg"><label class="fl">Thư mục đích trên máy phát sóng (drive V:)</label>
+    <input class="fi" name="dest_default" value="{{ dest_default }}" placeholder="V:\Thanhpham_PS_K1">
+    <div class="fh">Thư mục này sẽ được điền sẵn khi copy file và xuất .ply</div>
+  </div>
+  <div class="fg"><label class="fl">Tên/IP máy chủ lưu trữ</label>
+    <input class="fi" name="server_share" value="{{ server_share }}" placeholder="\\server-22t01 hoặc \\192.168.1.x">
+  </div>
+  <hr><button class="btn btn-primary">💾 Lưu cài đặt</button>
+</form></div>{% endblock %}

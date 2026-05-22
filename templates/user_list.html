@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% block title %}Tài khoản{% endblock %}{% block content %}
+<div class="page-header"><div class="page-title">Quản lý tài khoản</div><a href="{{ url_for('user_new') }}" class="btn btn-primary">+ Thêm</a></div>
+<div class="tbl-wrap"><table>
+  <thead><tr><th>#</th><th>Họ tên</th><th>Đăng nhập</th><th>Phòng ban</th><th>Vai trò</th><th>Trạng thái</th><th></th></tr></thead>
+  <tbody>{% for u in users %}<tr>
+    <td style="color:#97A0AF;font-size:12px">{{ u.id }}</td>
+    <td><div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;border-radius:50%;background:#E9F2FF;color:#0747A6;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">{{ u.initials() }}</div><span style="font-weight:600">{{ u.full_name }}</span></div></td>
+    <td style="font-family:Consolas,monospace;font-size:12px">{{ u.username }}</td>
+    <td>{{ u.phong_ban }}</td>
+    <td><span class="badge {% if u.role=='admin' %}b-tra{% elif u.role=='phongct' %}b-purple{% elif u.role=='phongcm' %}b-blue{% else %}b-gray{% endif %}">{{ u.role }}</span></td>
+    <td>{% if u.active %}<span class="badge b-duyet">Hoạt động</span>{% else %}<span class="badge b-gray">Tắt</span>{% endif %}</td>
+    <td><a href="{{ url_for('user_edit', uid=u.id) }}" class="btn btn-ghost btn-xs">Sửa</a></td>
+  </tr>{% endfor %}</tbody>
+</table></div>{% endblock %}

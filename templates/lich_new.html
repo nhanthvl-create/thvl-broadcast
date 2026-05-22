@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% block title %}Tạo lịch mới{% endblock %}{% block content %}
+<div class="page-header"><div class="page-title">Tạo lịch phát sóng mới</div><a href="{{ url_for('lich_list') }}" class="btn btn-ghost">← Quay lại</a></div>
+<div style="max-width:400px">
+<form method="POST" class="card">
+  <div class="fg"><label class="fl">Kênh</label><select class="fs" name="kenh"><option>THVL1</option><option>THVL2</option></select></div>
+  <div class="fg"><label class="fl">Ngày phát *</label><input class="fi" type="date" name="ngay_phat" required></div>
+  <div class="fg"><label class="fl">Ghi chú</label><textarea class="ft" name="ghi_chu" rows="2"></textarea></div>
+  <hr><div style="display:flex;justify-content:flex-end;gap:8px">
+    <a href="{{ url_for('lich_list') }}" class="btn btn-ghost">Hủy</a>
+    <button class="btn btn-primary">Tạo lịch</button>
+  </div>
+</form>
+<div class="alert a-info">💡 Sau khi tạo, bạn có thể thêm từng mục thủ công hoặc dùng chức năng <a href="{{ url_for('lich_upload') }}">Upload Excel HDPS</a> để import nhanh.</div>
+</div>
+{% endblock %}
