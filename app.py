@@ -5,8 +5,17 @@ from datetime import datetime, date, timedelta
 from functools import wraps
 import os, re, io, shutil, threading, time as ttime
 
-app = Flask(__name__)
+import os as _os
+_base_dir = _os.path.dirname(_os.path.abspath(__file__))
+app = Flask(__name__,
+            template_folder=_os.path.join(_base_dir, 'templates'),
+            static_folder=_os.path.join(_base_dir, 'static') if _os.path.exists(_os.path.join(_base_dir, 'static')) else None)
 app.secret_key = os.environ.get('SECRET_KEY', 'thvl-broadcast-2025-changeme')
+# Hien thi loi chi tiet tren browser khi chay cloud (debug tam thoi)
+if os.environ.get('RENDER'):
+    app.config['PROPAGATE_EXCEPTIONS'] = False
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
 
 # Database: PostgreSQL neu co DATABASE_URL (Render cloud), SQLite khi chay local
 _db_url = os.environ.get('DATABASE_URL', '')
@@ -37,7 +46,18 @@ def ensure_db():
 
 @app.route('/health')
 def health():
-    return 'OK', 200
+    try:
+        db.session.execute(db.text('SELECT 1'))
+        return 'OK - DB connected', 200
+    except Exception as e:
+        return f'DB ERROR: {e}', 500
+
+@app.errorhandler(500)
+def handle_500(e):
+    import traceback
+    tb = traceback.format_exc()
+    print('500 ERROR:', tb)
+    return f'<pre>500 Error:\n{tb}</pre>', 500
 
 # ═══════════════════════════════════════════════════
 #  MODELS
@@ -193,29 +213,53 @@ def parse_excel_hdps(filepath, ngay_phat, kenh, user_id):
     ext = os.path.splitext(filepath)[1].lower()
 
     if ext == '.xlsx':
+        # Dung openpyxl cho .xlsx
         import openpyxl
-        wb = openpyxl.load_workbook(filepath, data_only=True)
+        from openpyxl import load_workbook
+        wb = load_workbook(filepath, data_only=True)
         ws = wb.active
         for row in ws.iter_rows(values_only=True):
             rows.append(list(row))
     else:
+        # Dung xlrd cho .xls (dinh dang cu)
         import xlrd
-        wb = xlrd.open_workbook(filepath)
-        ws = wb.sheet_by_index(0)
-        for i in range(ws.nrows):
-            row = []
-            for j in range(ws.ncols):
-                cell = ws.cell(i, j)
-                if cell.ctype == xlrd.XL_CELL_DATE:
-                    import xlrd as _x
-                    t = _x.xldate_as_tuple(cell.value, wb.datemode)
-                    # Convert to time object
-                    class _T: 
-                        def __init__(s,h,m,sc): s.hour=h; s.minute=m; s.second=int(sc)
-                    row.append(_T(t[3], t[4], t[5]))
-                else:
-                    row.append(cell.value)
-            rows.append(row)
+        try:
+            wb = xlrd.open_workbook(filepath)
+        except Exception:
+            # Neu .xls that ra la .xlsx doi ten va thu lai
+            import shutil
+            new_path = filepath + 'x'
+            shutil.copy(filepath, new_path)
+            import openpyxl
+            wb2 = openpyxl.load_workbook(new_path, data_only=True)
+            ws2 = wb2.active
+            for row in ws2.iter_rows(values_only=True):
+                rows.append(list(row))
+            os.remove(new_path)
+            # skip xlrd section
+            wb = None
+        if wb is not None:
+            ws = wb.sheet_by_index(0)
+            for i in range(ws.nrows):
+                row = []
+                for j in range(ws.ncols):
+                    cell = ws.cell(i, j)
+                    if cell.ctype == xlrd.XL_CELL_DATE:
+                        try:
+                            t = xlrd.xldate_as_tuple(cell.value, wb.datemode)
+                            class _T:
+                                def __init__(s,h,m,sc): s.hour=h; s.minute=m; s.second=int(sc)
+                            row.append(_T(t[3], t[4], t[5]))
+                        except Exception:
+                            # Fallback: parse as fraction of day
+                            frac = cell.value % 1
+                            total_sec = int(frac * 86400)
+                            class _T2:
+                                def __init__(s,h,m,sc): s.hour=h; s.minute=m; s.second=sc
+                            row.append(_T2(total_sec//3600, (total_sec%3600)//60, total_sec%60))
+                    else:
+                        row.append(cell.value)
+                rows.append(row)
 
     # Delete existing lich if any
     lich = LichHDPS.query.filter_by(ngay_phat=ngay_phat, kenh=kenh).first()
