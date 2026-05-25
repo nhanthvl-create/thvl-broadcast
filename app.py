@@ -112,9 +112,12 @@ class LichItem(db.Model):
     tai_tro     = db.Column(db.String(20), default='khong')  # co | khong
     trang_thai  = db.Column(db.String(20), default='cho')
     # cho | co_file | da_xac_nhan | thieu_file
-    phieu_nt_id = db.Column(db.Integer, db.ForeignKey('phieu_nghiem_thu.id'), nullable=True)
-    phieu_nt    = db.relationship('PhieuNghiemThu')
-    ghi_chu     = db.Column(db.Text)
+    phieu_nt_id     = db.Column(db.Integer, db.ForeignKey('phieu_nghiem_thu.id'), nullable=True)
+    phieu_nt        = db.relationship('PhieuNghiemThu')
+    ghi_chu         = db.Column(db.Text)
+    nguoi_thao_tac  = db.Column(db.String(100))   # Người gán file vào lịch
+    file_size_mb    = db.Column(db.Float)          # Dung lượng file (MB)
+    thoi_luong_giay = db.Column(db.Integer)        # Thời lượng thực tế từ file (giây)
 
 
 class PhieuNghiemThu(db.Model):
@@ -551,9 +554,10 @@ def lich_detail(lid):
     }
     tl_qc_total = sum(tc_to_sec(i.tl_qc) for i in items)
     copy_jobs = CopyJob.query.filter_by(lich_id=lid).order_by(CopyJob.created_at.desc()).all()
+    all_users = User.query.filter_by(active=True).order_by(User.full_name).all()
     return render_template('lich_detail.html', lich=lich, items=items,
                            stats=stats, tl_qc_total=sec_to_tc(tl_qc_total),
-                           copy_jobs=copy_jobs)
+                           copy_jobs=copy_jobs, all_users=all_users)
 
 @app.route('/lich/<int:lid>/item/add', methods=['POST'])
 @login_required
@@ -618,6 +622,93 @@ def item_xac_nhan(iid):
     db.session.commit()
     return jsonify(ok=True)
 
+@app.route('/lich/item/<int:iid>/upload_mpg', methods=['POST'])
+@login_required
+def item_upload_mpg(iid):
+    """Upload file .mpg, doc ten + thoi luong, gan vao LichItem."""
+    item = LichItem.query.get_or_404(iid)
+    f = request.files.get('mpg_file')
+    nguoi_tt = request.form.get('nguoi_thao_tac', '').strip()
+
+    if not f or not f.filename:
+        return jsonify(ok=False, error='Chưa chọn file'), 400
+
+    fname = f.filename.strip()
+    # Strip path (Windows may send full path)
+    import ntpath
+    fname = ntpath.basename(fname)
+
+    if not fname.lower().endswith('.mpg'):
+        return jsonify(ok=False, error='Chỉ chấp nhận file .mpg'), 400
+
+    # Save temporarily to read duration
+    import tempfile, subprocess
+    tmp_path = None
+    duration_sec = None
+    file_size_mb = None
+
+    try:
+        with tempfile.NamedTemporaryFile(suffix='.mpg', delete=False) as tmp:
+            f.save(tmp)
+            tmp_path = tmp.name
+
+        file_size_mb = round(os.path.getsize(tmp_path) / (1024*1024), 1)
+
+        # Try ffprobe to get duration
+        try:
+            result = subprocess.run(
+                ['ffprobe', '-v', 'quiet', '-print_format', 'json',
+                 '-show_format', tmp_path],
+                capture_output=True, text=True, timeout=15
+            )
+            if result.returncode == 0:
+                import json
+                info = json.loads(result.stdout)
+                duration_sec = int(float(info.get('format', {}).get('duration', 0)))
+        except Exception:
+            duration_sec = None
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+
+    # Update item
+    ten_file_clean = fname[:-4] if fname.lower().endswith('.mpg') else fname
+    item.ten_file          = ten_file_clean
+    item.nguoi_thao_tac    = nguoi_tt or session.get('full_name', '')
+    item.file_size_mb      = file_size_mb
+    if duration_sec:
+        item.thoi_luong_giay = duration_sec
+        item.tl_ct = sec_to_tc(duration_sec)
+    item.trang_thai = 'co_file'
+    db.session.commit()
+
+    return jsonify(
+        ok=True,
+        ten_file=ten_file_clean,
+        tl_ct=item.tl_ct or '',
+        file_size_mb=file_size_mb,
+        duration_sec=duration_sec,
+        nguoi_thao_tac=item.nguoi_thao_tac,
+        trang_thai=item.trang_thai
+    )
+
+@app.route('/api/users_list')
+@login_required
+def api_users_list():
+    """Danh sach nhan vien cho dropdown nguoi thao tac."""
+    users = User.query.filter_by(active=True).order_by(User.full_name).all()
+    return jsonify([{'id': u.id, 'name': u.full_name, 'phong': u.phong_ban} for u in users])
+
+@app.route('/lich/item/<int:iid>/set_operator', methods=['POST'])
+@login_required
+def item_set_operator(iid):
+    item = LichItem.query.get_or_404(iid)
+    item.nguoi_thao_tac = request.form.get('nguoi_thao_tac', '').strip()
+    db.session.commit()
+    return jsonify(ok=True)
+
 @app.route('/lich/item/<int:iid>/delete', methods=['POST'])
 @login_required
 @roles('admin','phongct')
@@ -668,6 +759,9 @@ def api_lich_status(lid):
         'gio_phat': i.gio_phat, 'loai': i.loai,
         'trang_thai': i.trang_thai, 'tai_tro': i.tai_tro,
         'tl_ct': i.tl_ct, 'tl_qc': i.tl_qc,
+        'ten_file': i.ten_file or '',
+        'nguoi_thao_tac': i.nguoi_thao_tac or '',
+        'file_size_mb': i.file_size_mb,
     } for i in items])
 
 # ═══════════════════════════════════════════════════
@@ -937,9 +1031,25 @@ def settings():
 #  INIT DB
 # ═══════════════════════════════════════════════════
 
+def _migrate_columns():
+    # Add new columns to existing tables (safe: skips if already exists)
+    migrations = [
+        ('lich_item', 'nguoi_thao_tac', 'VARCHAR(100)'),
+        ('lich_item', 'file_size_mb', 'FLOAT'),
+        ('lich_item', 'thoi_luong_giay', 'INTEGER'),
+    ]
+    with db.engine.connect() as conn:
+        for table, col, typ in migrations:
+            try:
+                conn.execute(db.text(f'ALTER TABLE {table} ADD COLUMN {col} {typ}'))
+                conn.commit()
+            except Exception:
+                pass  # Column already exists
+
 def init_db():
     with app.app_context():
         db.create_all()
+        _migrate_columns()
         if not User.query.filter_by(username='admin').first():
             demo = [
                 ('admin',     'Quản trị hệ thống',     'Ban Giám đốc',        'admin',    'admin123'),

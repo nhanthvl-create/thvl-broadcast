@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+{% block title %}Lịch {{ lich.kenh }} {{ lich.ngay_phat.strftime('%d/%m/%Y') }}{% endblock %}
+{% block head %}
+<style>
+.item-row td{padding:6px 8px;vertical-align:middle}
+.gio{font-family:Consolas,monospace;font-size:12px;color:#42526E;white-space:nowrap}
+.ten-ct{font-weight:600;font-size:13px}
+.tl{font-family:Consolas,monospace;font-size:12px;text-align:center}
+.upload-zone{border:2px dashed #DFE1E6;border-radius:6px;padding:8px 10px;text-align:center;cursor:pointer;transition:all .2s;background:#FAFBFC;font-size:12px;color:#7A869A;min-width:140px}
+.upload-zone:hover,.upload-zone.drag{border-color:#4C9AFF;background:#E9F2FF;color:#0747A6}
+.upload-zone.done{border-color:#36B37E;background:#E3FCEF;color:#006644;cursor:pointer}
+.upload-zone input[type=file]{display:none}
+.op-sel{width:100%;font-size:12px;padding:4px 6px;border:1px solid #DFE1E6;border-radius:4px;background:#fff;color:#172B4D}
+.file-info{font-family:Consolas,monospace;font-size:11px;color:#006644;word-break:break-all;line-height:1.4}
+.tl-auto{color:#059669;font-weight:700}
+#uploadOverlay{display:none;position:fixed;bottom:20px;right:20px;background:#0747A6;color:#fff;padding:12px 18px;border-radius:8px;font-size:13px;z-index:300;box-shadow:0 4px 16px rgba(0,0,0,.25)}
+</style>
+{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <div class="page-title">
+      {{ lich.kenh }} — {{ lich.ngay_phat.strftime('%A, %d/%m/%Y') }}
+      <span class="badge {% if lich.trang_thai=='hoan_chinh' %}b-duyet{% elif lich.trang_thai=='da_xuat' %}b-blue{% else %}b-cho{% endif %}" style="font-size:12px;margin-left:8px">{{ lich.trang_thai }}</span>
+    </div>
+    <div class="page-sub">{{ stats.tong }} mục &middot; {{ stats.truc_tiep }} trực tiếp &middot; QC: {{ tl_qc_total }}</div>
+  </div>
+  <div class="btn-group">
+    {% if session.role in ['admin','phongct'] %}
+    <button onclick="document.getElementById('modalAdd').classList.add('open')" class="btn btn-ghost btn-sm">+ Thêm mục</button>
+    {% if lich.trang_thai == 'nhap' %}
+    <form method="POST" action="{{ url_for('lich_hoan_chinh', lid=lich.id) }}" style="display:inline">
+      <button class="btn btn-success btn-sm">✓ Hoàn chỉnh lịch</button>
+    </form>
+    {% endif %}
+    {% endif %}
+    <a href="{{ url_for('xuat_ply', lid=lich.id) }}" class="btn btn-primary btn-sm">⬇ Xuất .ply</a>
+  </div>
+</div>
+
+<div class="g4" style="margin-bottom:14px">
+  <div class="stat" style="padding:10px 14px"><div class="stat-val c-green" style="font-size:22px">{{ stats.da_xac_nhan }}</div><div class="stat-label">Đã xác nhận</div></div>
+  <div class="stat" style="padding:10px 14px"><div class="stat-val c-blue" style="font-size:22px">{{ stats.co_file }}</div><div class="stat-label">Đã có file</div></div>
+  <div class="stat" style="padding:10px 14px"><div class="stat-val c-amber" style="font-size:22px">{{ stats.cho }}</div><div class="stat-label">Chờ file</div></div>
+  <div class="stat" style="padding:10px 14px"><div class="stat-val c-red" style="font-size:22px">{{ stats.thieu }}</div><div class="stat-label">Thiếu file</div></div>
+</div>
+
+{% set pct = ((stats.da_xac_nhan + stats.co_file + stats.truc_tiep) / stats.tong * 100)|int if stats.tong > 0 else 0 %}
+<div style="margin-bottom:14px">
+  <div style="display:flex;justify-content:space-between;font-size:12px;color:#7A869A;margin-bottom:4px">
+    <span>Tiến độ chuẩn bị file</span><span id="pct-label">{{ pct }}%</span>
+  </div>
+  <div class="progress"><div class="progress-fill" id="pct-bar" style="width:{{ pct }}%"></div></div>
+</div>
+
+<div class="tbl-wrap">
+<table>
+  <thead>
+    <tr>
+      <th style="width:28px">#</th>
+      <th style="width:72px">Giờ phát</th>
+      <th style="min-width:160px">Tên chương trình</th>
+      <th style="width:70px;text-align:center">T.lượng</th>
+      <th style="width:55px;text-align:center">QC</th>
+      <th style="width:88px">Loại</th>
+      <th style="width:190px">📁 File phát sóng</th>
+      <th style="width:130px">👤 Người thao tác</th>
+      <th style="width:96px">Trạng thái</th>
+      {% if session.role in ['admin','phongct','phatsong'] %}<th style="width:52px"></th>{% endif %}
+    </tr>
+  </thead>
+  <tbody>
+  {% for item in items %}
+  <tr id="row-{{ item.id }}" class="item-row
+    {% if item.loai=='truc_tiep' %}trow-truc
+    {% elif item.trang_thai in ['da_xac_nhan','co_file'] %}trow-ok
+    {% elif item.trang_thai=='cho' %}trow-cho
+    {% elif item.trang_thai=='thieu_file' %}trow-thieu{% endif %}">
+
+    <td style="color:#97A0AF;font-size:11px">{{ item.stt }}</td>
+    <td class="gio">{{ item.gio_phat or '—' }}</td>
+
+    <td>
+      <div class="ten-ct">{{ item.ten_ct }}
+        {% if item.tai_tro=='co' %}<span class="badge b-duyet" style="font-size:10px;margin-left:4px">TÀI TRỢ</span>{% endif %}
+      </div>
+      {% if item.ghi_chu %}<div style="font-size:11px;color:#7A869A">{{ item.ghi_chu }}</div>{% endif %}
+    </td>
+
+    <td class="tl" id="tlct-{{ item.id }}">
+      {% if item.tl_ct %}
+        <span {% if item.thoi_luong_giay %}class="tl-auto" title="Đọc tự động từ file .mpg"{% endif %}>{{ item.tl_ct }}</span>
+      {% else %}—{% endif %}
+    </td>
+    <td class="tl" style="color:#974F0C">{{ item.tl_qc or '—' }}</td>
+
+    <td>
+      {% if item.loai=='truc_tiep' %}<span class="badge b-live">🔴 Trực tiếp</span>
+      {% elif item.loai=='phat_lai' %}<span class="badge b-gray">🔄 Phát lại</span>
+      {% elif item.loai=='phong_cm' %}<span class="badge b-purple">🏢 P.CM</span>
+      {% else %}<span class="badge b-blue">📁 File</span>{% endif %}
+    </td>
+
+    <!-- Cột file upload -->
+    <td>
+      {% if item.loai in ['truc_tiep','stop'] %}
+        <span style="font-size:11px;color:#97A0AF">—</span>
+      {% else %}
+        <div id="uz-{{ item.id }}"
+          class="upload-zone {{ 'done' if item.ten_file else '' }}"
+          onclick="triggerUpload({{ item.id }})"
+          ondragover="event.preventDefault();this.classList.add('drag')"
+          ondragleave="this.classList.remove('drag')"
+          ondrop="handleDrop({{ item.id }}, event)">
+          {% if item.ten_file %}
+            <div class="file-info">{{ item.ten_file }}.mpg</div>
+            {% if item.file_size_mb %}<div style="font-size:10px;color:#7A869A">{{ item.file_size_mb }} MB</div>{% endif %}
+            <div style="font-size:10px;color:#36B37E;margin-top:2px">✓ Nhấn để đổi file</div>
+          {% else %}
+            📂 Nhấn / kéo file .mpg vào đây
+          {% endif %}
+        </div>
+        <input type="file" id="fu-{{ item.id }}" accept=".mpg" style="display:none"
+               onchange="handleUpload({{ item.id }}, this)">
+      {% endif %}
+    </td>
+
+    <!-- Cột người thao tác -->
+    <td>
+      {% if item.loai in ['truc_tiep','stop'] %}
+        <span style="font-size:11px;color:#97A0AF">—</span>
+      {% else %}
+        <select class="op-sel" id="op-{{ item.id }}" onchange="saveOperator({{ item.id }})">
+          <option value="">— Chọn —</option>
+          {% for u in all_users %}
+          <option value="{{ u.full_name }}" {% if item.nguoi_thao_tac==u.full_name %}selected{% endif %}>{{ u.full_name }}</option>
+          {% endfor %}
+        </select>
+      {% endif %}
+    </td>
+
+    <!-- Trạng thái -->
+    <td>
+      <span id="badge-{{ item.id }}" class="badge
+        {{ 'b-cho' if item.trang_thai=='cho'
+        else 'b-blue' if item.trang_thai=='co_file'
+        else 'b-duyet' if item.trang_thai=='da_xac_nhan'
+        else 'b-tra' if item.trang_thai=='thieu_file'
+        else 'b-live' if item.trang_thai=='truc_tiep'
+        else 'b-gray' }}">
+        {{ {'cho':'Chờ file','co_file':'Có file','da_xac_nhan':'Đã xác nhận',
+            'thieu_file':'Thiếu file','truc_tiep':'Trực tiếp','stop':'Stop'
+           }.get(item.trang_thai, item.trang_thai) }}
+      </span>
+    </td>
+
+    {% if session.role in ['admin','phongct','phatsong'] %}
+    <td>
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <a href="{{ url_for('item_edit', iid=item.id) }}" class="btn btn-ghost btn-xs">✏️</a>
+        {% if item.trang_thai=='co_file' and session.role in ['admin','phongct'] %}
+        <form method="POST" action="{{ url_for('item_xac_nhan', iid=item.id) }}" style="display:inline">
+          <button class="btn btn-success btn-xs" title="Xác nhận">✓</button>
+        </form>
+        {% endif %}
+      </div>
+    </td>
+    {% endif %}
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<div id="uploadOverlay"><span id="uploadMsg">Đang upload...</span></div>
+
+<!-- Modal thêm mục -->
+<div class="modal-bg" id="modalAdd">
+  <div class="modal-box">
+    <div class="modal-h">
+      <div class="modal-title">Thêm mục vào lịch</div>
+      <button onclick="document.getElementById('modalAdd').classList.remove('open')" class="btn btn-ghost btn-sm">✕</button>
+    </div>
+    <form method="POST" action="{{ url_for('item_add', lid=lich.id) }}">
+      <div class="g2">
+        <div class="fg"><label class="fl">Giờ phát</label><input class="fi" name="gio_phat" type="time" step="1"></div>
+        <div class="fg"><label class="fl">Loại</label>
+          <select class="fs" name="loai">
+            <option value="file">📁 Có file</option>
+            <option value="truc_tiep">🔴 Trực tiếp</option>
+            <option value="phat_lai">🔄 Phát lại</option>
+            <option value="phong_cm">🏢 Phòng CM giao</option>
+          </select>
+        </div>
+      </div>
+      <div class="fg"><label class="fl">Tên chương trình *</label><input class="fi" name="ten_ct" required></div>
+      <div class="g2">
+        <div class="fg"><label class="fl">Thời lượng CT</label><input class="fi" name="tl_ct" placeholder="00:30:00"></div>
+        <div class="fg"><label class="fl">Thời lượng QC</label><input class="fi" name="tl_qc" placeholder="00:03:00"></div>
+      </div>
+      <div class="g2">
+        <div class="fg"><label class="fl">Tài trợ</label>
+          <select class="fs" name="tai_tro"><option value="khong">Không</option><option value="co">Có tài trợ</option></select>
+        </div>
+        <div class="fg"><label class="fl">Ghi chú</label><input class="fi" name="ghi_chu"></div>
+      </div>
+      <hr>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button type="button" onclick="document.getElementById('modalAdd').classList.remove('open')" class="btn btn-ghost">Hủy</button>
+        <button type="submit" class="btn btn-primary">Thêm</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function triggerUpload(iid){ document.getElementById('fu-'+iid).click(); }
+function handleDrop(iid,ev){ ev.preventDefault(); document.getElementById('uz-'+iid).classList.remove('drag'); if(ev.dataTransfer.files[0]) uploadFile(iid,ev.dataTransfer.files[0]); }
+function handleUpload(iid,inp){ if(inp.files[0]) uploadFile(iid,inp.files[0]); }
+function getOp(iid){ const s=document.getElementById('op-'+iid); return s?s.value:''; }
+
+function uploadFile(iid, file){
+  if(!file.name.toLowerCase().endsWith('.mpg')){ alert('Chỉ chấp nhận file .mpg'); return; }
+  const op = getOp(iid);
+  if(!op){ alert('Vui lòng chọn Người thao tác trước!'); return; }
+
+  const ov=document.getElementById('uploadOverlay'), msg=document.getElementById('uploadMsg');
+  ov.style.display='block';
+  msg.textContent='⬆ Đang upload '+file.name+'...';
+
+  const fd=new FormData();
+  fd.append('mpg_file', file);
+  fd.append('nguoi_thao_tac', op);
+
+  fetch('/lich/item/'+iid+'/upload_mpg',{method:'POST',body:fd})
+    .then(r=>r.json()).then(d=>{
+      ov.style.display='none';
+      if(!d.ok){ alert('Lỗi: '+d.error); return; }
+
+      // Update upload zone
+      const uz=document.getElementById('uz-'+iid);
+      if(uz){
+        uz.className='upload-zone done';
+        uz.innerHTML='<div class="file-info">'+d.ten_file+'.mpg</div>'
+          +(d.file_size_mb?'<div style="font-size:10px;color:#7A869A">'+d.file_size_mb+' MB</div>':'')
+          +'<div style="font-size:10px;color:#36B37E;margin-top:2px">✓ Nhấn để đổi file</div>';
+      }
+
+      // Update thời lượng
+      if(d.tl_ct){ const el=document.getElementById('tlct-'+iid); if(el) el.innerHTML='<span class="tl-auto" title="Đọc từ file .mpg">'+d.tl_ct+'</span>'; }
+
+      // Update badge
+      const b=document.getElementById('badge-'+iid);
+      if(b){ b.className='badge b-blue'; b.textContent='Có file'; }
+
+      // Flash row
+      const row=document.getElementById('row-'+iid);
+      if(row){ row.style.background='#E3FCEF'; setTimeout(()=>row.style.background='',2000); }
+    })
+    .catch(e=>{ ov.style.display='none'; alert('Upload lỗi: '+e); });
+}
+
+function saveOperator(iid){
+  const op=document.getElementById('op-'+iid).value;
+  if(!op) return;
+  fetch('/lich/item/'+iid+'/set_operator',{
+    method:'POST',
+    headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:'nguoi_thao_tac='+encodeURIComponent(op)
+  }).catch(()=>{});
+}
+
+// Realtime poll
+setInterval(()=>{
+  fetch('/api/lich/{{ lich.id }}/status').then(r=>r.json()).then(items=>{
+    let ok=0;
+    const CLS={cho:'b-cho',co_file:'b-blue',da_xac_nhan:'b-duyet',thieu_file:'b-tra',truc_tiep:'b-live',stop:'b-gray'};
+    const LBL={cho:'Chờ file',co_file:'Có file',da_xac_nhan:'Đã xác nhận',thieu_file:'Thiếu file',truc_tiep:'Trực tiếp',stop:'Stop'};
+    items.forEach(i=>{
+      const b=document.getElementById('badge-'+i.id);
+      if(b){ b.className='badge '+(CLS[i.trang_thai]||'b-gray'); b.textContent=LBL[i.trang_thai]||i.trang_thai; }
+      if(['da_xac_nhan','co_file','truc_tiep'].includes(i.trang_thai)) ok++;
+    });
+    const pct=items.length?Math.round(ok/items.length*100):0;
+    const bar=document.getElementById('pct-bar'), lbl=document.getElementById('pct-label');
+    if(bar) bar.style.width=pct+'%';
+    if(lbl) lbl.textContent=pct+'%';
+  }).catch(()=>{});
+}, 10000);
+
+document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open')}));
+</script>
+{% endblock %}
